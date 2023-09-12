@@ -68,7 +68,7 @@ class PingToolApp(tk.Tk):
         
         
 
-        self.label_instruction = ttk.Label(self, text="Enter the list of IP addresses(seperated by line), set your configuration, then click 'Start Ping'")
+        self.label_instruction = ttk.Label(self, text="Enter the list of IP addresses(seperated by space or line), set your configuration, then click 'Start Ping'")
         self.text_ip_addresses = tk.Text(self, height=5, width=40)
         self.button_open_form = ttk.Button(self, text="Open Ping Configuration", command=self.open_form)
         self.button_clear = ttk.Button(self, text="Refresh Ping Data", command=self.refresh_ping)
@@ -82,13 +82,13 @@ class PingToolApp(tk.Tk):
         self.result_table.heading("#0", text="Device", anchor="w")
         self.result_table.column("#0", width="200", anchor="w")
         self.result_table.heading("#1", text="Date Time", anchor="center")
-        self.result_table.column("#1", width="130", anchor="center")
+        self.result_table.column("#1", width="110", anchor="center")
         self.result_table.heading("#2", text="Reply IP", anchor="center")
         self.result_table.column("#2", width="200", anchor="center")
         self.result_table.heading("#3", text="TTL", anchor="center")
         self.result_table.column("#3", width="75", anchor="center")
         self.result_table.heading("#4", text="Status", anchor="center")
-        self.result_table.column("#4", width="75", anchor="center")
+        self.result_table.column("#4", width="150", anchor="center")
         self.result_table.heading("#5", text="Ping Time", anchor="center")
         self.result_table.column("#5", width="75", anchor="center")
 
@@ -99,8 +99,8 @@ class PingToolApp(tk.Tk):
         scrollbar.grid(row=3, column=4, sticky="ns")
         self.result_table.grid(row=3, column=0, columnspan=4, padx=10, pady=5, sticky="nsew")
 
-        self.result_table.tag_configure('Success', background='green')
-        self.result_table.tag_configure('Failed', background='red')
+        self.result_table.tag_configure('Success', background='lightgreen')
+        self.result_table.tag_configure('Failed', background='tomato2')
 
         self.label_instruction.grid(row=0, column=0, columnspan=4, padx=10, pady=5, sticky="w")
         self.text_ip_addresses.grid(row=1, column=0, columnspan=4, padx=10, pady=5)
@@ -141,7 +141,8 @@ class PingToolApp(tk.Tk):
         self.button_start.state(["disabled"]) 
         self.button_stop.state(["!disabled"]) 
 
-        ip_addresses = self.text_ip_addresses.get("1.0", "end-1c").split('\n')
+        text = self.text_ip_addresses.get("1.0", "end-1c")
+        ip_addresses = re.split(r'\n| ', text)
         interval = self.ping_config["interval"]
         timeout_ms = self.ping_config["timeout_ms"]
         size_bytes = self.ping_config["size_bytes"]
@@ -219,6 +220,8 @@ class PingToolApp(tk.Tk):
 
                     # Add all the ping data to the treeview
                     for ip_address, data_list in self.ping_data.items():
+                        successes = 0
+                        fails = 0
                         # Create a unique identifier for this IP's subtree
                         subtree_id = self.result_table.insert("", "end", text=ip_address)
 
@@ -226,9 +229,16 @@ class PingToolApp(tk.Tk):
                         for data in data_list:
                             if data[3] == "Success":
                                 tag = "Success"
+                                successes +=1
                             else:
                                 tag = "Failed"
-                            self.result_table.insert(subtree_id, "end", values=data, tags = tag)
+                                fails+=1
+                            
+                            newItem = self.result_table.insert(subtree_id, "end", values=data, tags = tag)
+                            parent_item = self.result_table.parent(newItem)
+                            self.result_table.set(parent_item, 3, 'Successes: '+ str(successes))
+                            self.result_table.set(parent_item, 4, 'Timeouts: '+ str(fails))
+
 
                 except subprocess.CalledProcessError:
                     ping_data = [
@@ -248,14 +258,21 @@ class PingToolApp(tk.Tk):
                     for ip_address, data_list in self.ping_data.items():
                         # Create a unique identifier for this IP's subtree
                         subtree_id = self.result_table.insert("", "end", text=ip_address)
+                        fails = 0
+                        successes = 0
 
                         # Add the ping data to the treeview under the IP's subtree
                         for data in data_list:
                             if data[3] == "Success":
                                 tag = "Success"
+                                successes+=1
                             else:
                                 tag = "Failed"
-                            self.result_table.insert(subtree_id, "end", values=data,tags = tag)
+                                fails+=1
+                            newItem = self.result_table.insert(subtree_id, "end", values=data,tags = tag)
+                            parent_item = self.result_table.parent(newItem)
+                            self.result_table.set(parent_item, 4, 'Timeouts: '+ str(fails))
+                            self.result_table.set(parent_item, 3, 'Successes: '+ str(successes))                            
 
             if self.ping_running:
 
