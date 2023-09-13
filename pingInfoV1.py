@@ -93,7 +93,6 @@ class PingToolApp(tk.Tk):
         self.button_start = ttk.Button(self, text="Start Ping", command=self.start_ping)
         self.button_stop = ttk.Button(self, text="Stop Ping", command=self.stop_ping)
         self.button_stop.state(["disabled"]) 
-        self.button_exit = ttk.Button(self, text="Exit", command=self.quit)
 
         # Create a table (Treeview widget) to display devices and their ping results
         self.result_table = ttk.Treeview(self, columns=("Datetime", "Reply IP", "TTL", "Status", "Ping Time"), show="tree headings")
@@ -127,7 +126,6 @@ class PingToolApp(tk.Tk):
         self.button_clear.grid(row=4, column=1, padx=10, pady=5, sticky="e")
         self.button_start.grid(row=2, column=1, padx=5, pady=5, sticky="e")
         self.button_stop.grid(row=2, column=2, padx=5, pady=5, sticky="w")
-        self.button_exit.grid(row=2, column=3, padx=5, pady=5, sticky="w")
         self.result_table.grid(row=3, column=0, columnspan=4, padx=10, pady=5, sticky="nsew")
 
         self.grid_rowconfigure(3, weight=1)
@@ -183,6 +181,46 @@ class PingToolApp(tk.Tk):
                     tree.item(item, open=True)
                 else:
                     tree.item(item, open=False)
+        def handleBadHostname(ip_address):
+            # Store the ping data in the dictionary under the
+            # IP address key
+            ping_data = [
+                        [datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "", "", "Bad Hostname", ""]
+                    ]
+            if ip_address not in self.ping_data:
+                self.ping_data[ip_address] = []
+            self.ping_data[ip_address].extend(ping_data)
+
+            # Clear the treeview
+            self.result_table.delete(*self.result_table.get_children())
+
+
+            # Add all the ping data to the treeview
+            index =0
+            for ip_address, data_list in self.ping_data.items():
+                # Create a unique identifier for this IP's subtree
+                if (index%2) == 0:
+                    subtree_id = self.result_table.insert("", "end", text=ip_address)
+                else:
+                    subtree_id = self.result_table.insert("", "end", text=ip_address, tags = "Gray")
+                
+                index+=1
+                fails = 0
+                successes = 0
+
+                # Add the ping data to the treeview under the IP's subtree
+                for data in data_list:
+                    if data[3] == "Success":
+                        tag = "Success"
+                        successes+=1
+                    else:
+                        tag = "Failed"
+                        fails+=1
+                    newItem = self.result_table.insert(subtree_id, "end", values=data,tags = tag)
+                    parent_item = self.result_table.parent(newItem)
+                    self.result_table.set(parent_item, 4, 'Timeouts: '+ str(fails))
+                    self.result_table.set(parent_item, 3, 'Successes: '+ str(successes))
+            
 
 
 
@@ -199,12 +237,19 @@ class PingToolApp(tk.Tk):
                     if ":" in ip_address:
                         # IPv6 address
                         # Check for IPv6 format
-                        socket.inet_pton(socket.AF_INET6, ip_address)
-                        command = self.get_ping_command(ip_address, system, timeout_ms, size_bytes, ipv6=True)
+                        try:
+                            socket.inet_pton(socket.AF_INET6, ip_address)
+                        except socket.error:
+                            handleBadHostname(ip_address)
+                            continue
                     else:
                         # IPv4 address
                         # Check for IPv4 format
-                        socket.inet_pton(socket.AF_INET, ip_address)
+                        try:
+                            socket.inet_pton(socket.AF_INET, ip_address)
+                        except socket.error:
+                            handleBadHostname(ip_address)
+                            continue
                         command = self.get_ping_command(ip_address, system, timeout_ms, size_bytes, ipv6=False)
 
                     socket.gethostbyaddr(ip_address)
@@ -276,47 +321,6 @@ class PingToolApp(tk.Tk):
                             self.result_table.set(parent_item, 3, 'Successes: '+ str(successes))
                             self.result_table.set(parent_item, 4, 'Timeouts: '+ str(fails))
 
-                except socket.error:
-                    ping_data = [
-                        [datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "", "", "Bad Hostname", ""]
-                    ]
-
-                    # Store the ping data in the dictionary under the
-                    # IP address key
-                    if ip_address not in self.ping_data:
-                        self.ping_data[ip_address] = []
-                    self.ping_data[ip_address].extend(ping_data)
-
-                    # Clear the treeview
-                    self.result_table.delete(*self.result_table.get_children())
-
-
-                    # Add all the ping data to the treeview
-                    index =0
-                    for ip_address, data_list in self.ping_data.items():
-                        # Create a unique identifier for this IP's subtree
-                        if (index%2) == 0:
-                            subtree_id = self.result_table.insert("", "end", text=ip_address)
-                        else:
-                            subtree_id = self.result_table.insert("", "end", text=ip_address, tags = "Gray")
-                        
-                        index+=1
-                        fails = 0
-                        successes = 0
-
-                        # Add the ping data to the treeview under the IP's subtree
-                        for data in data_list:
-                            if data[3] == "Success":
-                                tag = "Success"
-                                successes+=1
-                            else:
-                                tag = "Failed"
-                                fails+=1
-                            newItem = self.result_table.insert(subtree_id, "end", values=data,tags = tag)
-                            parent_item = self.result_table.parent(newItem)
-                            self.result_table.set(parent_item, 4, 'Timeouts: '+ str(fails))
-                            self.result_table.set(parent_item, 3, 'Successes: '+ str(successes)) 
-                
                 except subprocess.CalledProcessError:
                     ping_data = [
                         [datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "", "", "Failed", "Timeout"]
