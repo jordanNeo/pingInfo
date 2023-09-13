@@ -86,7 +86,7 @@ class PingToolApp(tk.Tk):
         
         
 
-        self.label_instruction = ttk.Label(self, text="Enter the list of IP addresses(seperated by space or line), set your configuration, then click 'Start Ping'")
+        self.label_instruction = ttk.Label(self, text="Enter the list of IP addresses(seperated by space or line), set your configuration, then click 'Start Ping' \n Note: if you ping an adress BMW has blocked by a firewall the application will take longer than timeout time to process.")
         self.text_ip_addresses = tk.Text(self, height=5, width=40)
         self.button_open_form = ttk.Button(self, text="Open Ping Configuration", command=self.open_form)
         self.button_clear = ttk.Button(self, text="Refresh Ping Data", command=self.refresh_ping)
@@ -242,6 +242,7 @@ class PingToolApp(tk.Tk):
                         except socket.error:
                             handleBadHostname(ip_address)
                             continue
+                        command = self.get_ping_command(ip_address, system, timeout_ms, size_bytes, ipv6=True)
                     else:
                         # IPv4 address
                         # Check for IPv4 format
@@ -252,7 +253,6 @@ class PingToolApp(tk.Tk):
                             continue
                         command = self.get_ping_command(ip_address, system, timeout_ms, size_bytes, ipv6=False)
 
-                    socket.gethostbyaddr(ip_address)
 
 
                     result = subprocess.run(
