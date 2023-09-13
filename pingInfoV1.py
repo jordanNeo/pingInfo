@@ -56,9 +56,27 @@ class PingConfigForm(tk.Toplevel):
         self.destroy()
 
 class PingToolApp(tk.Tk):
+    def load_ip_addresses(self):
+        try:
+            with open("ip_addresses.txt", "r") as file:
+                ip_addresses = file.read()
+                self.text_ip_addresses.insert("1.0", ip_addresses)
+        except FileNotFoundError:
+            pass 
+
+    def save_ip_addresses(self):
+        ip_addresses = self.text_ip_addresses.get("1.0", "end-1c")  # Get the text content from the Text widget
+        with open("ip_addresses.txt", "w") as file:
+            file.write(ip_addresses)
+
+    def on_closing(self):
+        self.save_ip_addresses()
+        self.destroy()
+
     def __init__(self):
         super().__init__()
         self.title("Ping Tool")
+        self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
         # Style configuration
         style = ttk.Style()
@@ -114,6 +132,8 @@ class PingToolApp(tk.Tk):
 
         self.grid_rowconfigure(3, weight=1)
         self.grid_columnconfigure(0, weight=1, )
+
+        self.load_ip_addresses()
 
         self.ping_config = {
             "ip_addresses": [],
