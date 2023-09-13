@@ -5,7 +5,7 @@ import re
 from datetime import datetime
 import tkinter as tk
 from tkinter import ttk
-import PyInstaller
+import socket
 
 # Check if running as a PyInstaller executable
 is_pyinstaller = getattr(sys, 'frozen', False)
@@ -82,7 +82,7 @@ class PingToolApp(tk.Tk):
         self.result_table.heading("#0", text="Device", anchor="w")
         self.result_table.column("#0", width="200", anchor="w")
         self.result_table.heading("#1", text="Date Time", anchor="center")
-        self.result_table.column("#1", width="110", anchor="center")
+        self.result_table.column("#1", width="115", anchor="center")
         self.result_table.heading("#2", text="Reply IP", anchor="center")
         self.result_table.column("#2", width="200", anchor="center")
         self.result_table.heading("#3", text="TTL", anchor="center")
@@ -101,6 +101,7 @@ class PingToolApp(tk.Tk):
 
         self.result_table.tag_configure('Success', background='lightgreen')
         self.result_table.tag_configure('Failed', background='tomato2')
+        self.result_table.tag_configure('Gray', background='lightblue')
 
         self.label_instruction.grid(row=0, column=0, columnspan=4, padx=10, pady=5, sticky="w")
         self.text_ip_addresses.grid(row=1, column=0, columnspan=4, padx=10, pady=5)
@@ -173,13 +174,21 @@ class PingToolApp(tk.Tk):
                     continue
 
                 try:
+
                     system = platform.system()
                     if ":" in ip_address:
                         # IPv6 address
+                        # Check for IPv6 format
+                        socket.inet_pton(socket.AF_INET6, ip_address)
                         command = self.get_ping_command(ip_address, system, timeout_ms, size_bytes, ipv6=True)
                     else:
                         # IPv4 address
+                        # Check for IPv4 format
+                        socket.inet_pton(socket.AF_INET, ip_address)
                         command = self.get_ping_command(ip_address, system, timeout_ms, size_bytes, ipv6=False)
+
+                    socket.gethostbyaddr(ip_address)
+
 
                     result = subprocess.run(
                         command,
@@ -219,12 +228,20 @@ class PingToolApp(tk.Tk):
                     self.result_table.delete(*self.result_table.get_children())
 
                     # Add all the ping data to the treeview
+                    index = 0
                     for ip_address, data_list in self.ping_data.items():
                         successes = 0
                         fails = 0
                         # Create a unique identifier for this IP's subtree
-                        subtree_id = self.result_table.insert("", "end", text=ip_address)
+                        if (index%2) == 0:
+                            subtree_id = self.result_table.insert("", "end", text=ip_address)
+                        
+                        
+                        else:
+                            subtree_id = self.result_table.insert("", "end", text=ip_address, tags = "Gray")
 
+                        index+=1
+                            
                         # Add the ping data to the treeview under the IP's subtree
                         for data in data_list:
                             if data[3] == "Success":
@@ -239,7 +256,47 @@ class PingToolApp(tk.Tk):
                             self.result_table.set(parent_item, 3, 'Successes: '+ str(successes))
                             self.result_table.set(parent_item, 4, 'Timeouts: '+ str(fails))
 
+                except socket.error:
+                    ping_data = [
+                        [datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "", "", "Bad Hostname", ""]
+                    ]
 
+                    # Store the ping data in the dictionary under the
+                    # IP address key
+                    if ip_address not in self.ping_data:
+                        self.ping_data[ip_address] = []
+                    self.ping_data[ip_address].extend(ping_data)
+
+                    # Clear the treeview
+                    self.result_table.delete(*self.result_table.get_children())
+
+
+                    # Add all the ping data to the treeview
+                    index =0
+                    for ip_address, data_list in self.ping_data.items():
+                        # Create a unique identifier for this IP's subtree
+                        if (index%2) == 0:
+                            subtree_id = self.result_table.insert("", "end", text=ip_address)
+                        else:
+                            subtree_id = self.result_table.insert("", "end", text=ip_address, tags = "Gray")
+                        
+                        index+=1
+                        fails = 0
+                        successes = 0
+
+                        # Add the ping data to the treeview under the IP's subtree
+                        for data in data_list:
+                            if data[3] == "Success":
+                                tag = "Success"
+                                successes+=1
+                            else:
+                                tag = "Failed"
+                                fails+=1
+                            newItem = self.result_table.insert(subtree_id, "end", values=data,tags = tag)
+                            parent_item = self.result_table.parent(newItem)
+                            self.result_table.set(parent_item, 4, 'Timeouts: '+ str(fails))
+                            self.result_table.set(parent_item, 3, 'Successes: '+ str(successes)) 
+                
                 except subprocess.CalledProcessError:
                     ping_data = [
                         [datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "", "", "Failed", "Timeout"]
@@ -254,10 +311,17 @@ class PingToolApp(tk.Tk):
                     # Clear the treeview
                     self.result_table.delete(*self.result_table.get_children())
 
+
                     # Add all the ping data to the treeview
+                    index =0
                     for ip_address, data_list in self.ping_data.items():
                         # Create a unique identifier for this IP's subtree
-                        subtree_id = self.result_table.insert("", "end", text=ip_address)
+                        if (index%2) == 0:
+                            subtree_id = self.result_table.insert("", "end", text=ip_address)
+                        else:
+                            subtree_id = self.result_table.insert("", "end", text=ip_address, tags = "Gray")
+                        
+                        index+=1
                         fails = 0
                         successes = 0
 
@@ -275,8 +339,8 @@ class PingToolApp(tk.Tk):
                             self.result_table.set(parent_item, 3, 'Successes: '+ str(successes))                            
 
             if self.ping_running:
-
                 self.ping_timer_id = self.after(interval * 1000, ping_devices)
+
             reopen_treeview(self.result_table,state_dict)
 
         ping_devices()
