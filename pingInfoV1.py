@@ -86,7 +86,7 @@ class PingToolApp(tk.Tk):
         
         
 
-        self.label_instruction = ttk.Label(self, text="Enter the list of IP addresses(seperated by space or line), set your configuration, then click 'Start Ping' \n Note: if you ping an adress BMW has blocked by a firewall the application will take longer than timeout time to process.")
+        self.label_instruction = ttk.Label(self, text="Enter the list of IP addresses(seperated by space or line), set your configuration, then click 'Start Ping'")
         self.text_ip_addresses = tk.Text(self, height=5, width=40)
         self.button_open_form = ttk.Button(self, text="Open Ping Configuration", command=self.open_form)
         self.button_clear = ttk.Button(self, text="Refresh Ping Data", command=self.refresh_ping)
