@@ -6,13 +6,14 @@ from datetime import datetime
 import tkinter as tk
 from tkinter import ttk
 import socket
-import concurrent.futures
+import multiprocessing
 
 # Check if running as a PyInstaller executable
 is_pyinstaller = getattr(sys, 'frozen', False)
 
 # If running as a PyInstaller executable, set the creationflags to hide the console
 subprocess_args = {'creationflags': subprocess.CREATE_NO_WINDOW} if is_pyinstaller else {}
+
 
 ping_data = {}
 
@@ -299,18 +300,24 @@ class PingToolApp(tk.Tk):
             traverse_top_level(self.result_table, state_dict=state_dict)
             # Define a function to ping a single IP address
 
-            with concurrent.futures.ProcessPoolExecutor() as executor:
-                futures = [executor.submit(ping_single_ip, ip_address.strip(), timeout_ms, size_bytes) for ip_address in ip_addresses]
+            with multiprocessing.Pool(processes=2 * multiprocessing.cpu_count()) as pool:
+                results = []
 
-                for future, ip_address in zip(concurrent.futures.as_completed(futures), ip_addresses):
-                    ip_address,ping_data = future.result()
+                for ip_address in ip_addresses:
+                    result = pool.apply_async(ping_single_ip, (ip_address.strip(), timeout_ms, size_bytes))
+                    results.append(result)
 
+                for result, ip_address in zip(results, ip_addresses):
+                    ip_address, ping_data = result.get()
 
                     if ip_address not in self.ping_data:
                         self.ping_data[ip_address] = []
                     self.ping_data[ip_address].extend(ping_data)
 
-                    
+
+                
+   
+
             self.result_table.delete(*self.result_table.get_children())
 
             # Add all the ping data to the treeview
@@ -362,6 +369,8 @@ class PingToolApp(tk.Tk):
 
 
 if __name__ == "__main__":
+    multiprocessing.freeze_support()
+    
     app = PingToolApp()
     app.tk.call("source", "azure.tcl")
     app.tk.call("set_theme", "light")
