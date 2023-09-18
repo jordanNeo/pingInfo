@@ -307,38 +307,6 @@ class PingToolApp(tk.Tk):
                     if ip_address not in self.ping_data:
                         self.ping_data[ip_address] = []
                     self.ping_data[ip_address].extend(ping_data)
-
-                    # Clear the treeview
-                    self.result_table.delete(*self.result_table.get_children())
-
-                    # Add all the ping data to the treeview
-                    index = 0
-                    for ip_address, data_list in self.ping_data.items():
-                        successes = 0
-                        fails = 0
-                        # Create a unique identifier for this IP's subtree
-                        if (index%2) == 0:
-                            subtree_id = self.result_table.insert("", "end", text=ip_address)
-                        
-                        
-                        else:
-                            subtree_id = self.result_table.insert("", "end", text=ip_address, tags = "Gray")
-
-                        index+=1
-                            
-                        # Add the ping data to the treeview under the IP's subtree
-                        for data in data_list:
-                            if data[3] == "Success":
-                                tag = "Success"
-                                successes +=1
-                            else:
-                                tag = "Failed"
-                                fails+=1
-                            
-                            newItem = self.result_table.insert(subtree_id, "end", values=data, tags = tag)
-                            parent_item = self.result_table.parent(newItem)
-                            self.result_table.set(parent_item, 3, 'Successes: '+ str(successes))
-                            self.result_table.set(parent_item, 4, 'Timeouts: '+ str(fails))
                 except socket.error:
                             handleBadHostname(ip_address)
 
@@ -381,7 +349,39 @@ class PingToolApp(tk.Tk):
                             newItem = self.result_table.insert(subtree_id, "end", values=data,tags = tag)
                             parent_item = self.result_table.parent(newItem)
                             self.result_table.set(parent_item, 4, 'Timeouts: '+ str(fails))
-                            self.result_table.set(parent_item, 3, 'Successes: '+ str(successes))                            
+                            self.result_table.set(parent_item, 3, 'Successes: '+ str(successes))
+
+            # Clear the treeview
+            self.result_table.delete(*self.result_table.get_children())
+
+            # Add all the ping data to the treeview
+            index = 0
+            for ip_address, data_list in self.ping_data.items():
+                successes = 0
+                fails = 0
+                # Create a unique identifier for this IP's subtree
+                if (index%2) == 0:
+                    subtree_id = self.result_table.insert("", "end", text=ip_address)
+                
+                
+                else:
+                    subtree_id = self.result_table.insert("", "end", text=ip_address, tags = "Gray")
+
+                index+=1
+                    
+                # Add the ping data to the treeview under the IP's subtree
+                for data in data_list:
+                    if data[3] == "Success":
+                        tag = "Success"
+                        successes +=1
+                    else:
+                        tag = "Failed"
+                        fails+=1
+                    
+                    newItem = self.result_table.insert(subtree_id, "end", values=data, tags = tag)
+                    parent_item = self.result_table.parent(newItem)
+                    self.result_table.set(parent_item, 3, 'Successes: '+ str(successes))
+                    self.result_table.set(parent_item, 4, 'Timeouts: '+ str(fails))                            
 
             if self.ping_running:
                 self.ping_timer_id = self.after(interval * 1000, ping_devices)
