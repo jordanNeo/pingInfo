@@ -6,12 +6,122 @@ from datetime import datetime
 import tkinter as tk
 from tkinter import ttk
 import socket
+import concurrent.futures
 
 # Check if running as a PyInstaller executable
 is_pyinstaller = getattr(sys, 'frozen', False)
 
 # If running as a PyInstaller executable, set the creationflags to hide the console
 subprocess_args = {'creationflags': subprocess.CREATE_NO_WINDOW} if is_pyinstaller else {}
+
+ping_data = {}
+
+
+def ping_single_ip(ip_address, timeout_ms, size_bytes):
+                
+    def checkString(str):
+
+        # initializing flag variable
+        flag_l = False
+
+        # checking for letter and numbers in
+        # given string
+        for i in str:
+
+            # if string has letter
+            if i.isalpha():
+                flag_l = True
+
+
+        return flag_l
+    
+    def handleBadHostname(ip_address):
+            # Store the ping data in the dictionary under the
+            # IP address key
+            ping_data2 = [
+                        [datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "", "", "Bad Hostname", ""]
+                    ]
+            return ip_address,ping_data2
+    
+    def get_ping_command(ip_address, system, timeout_ms, size_bytes, ipv6=False):
+        command = []
+        if system == "Windows":
+            if ipv6:
+                command = ["ping", "-6", "-n", "1", "-w", str(timeout_ms), "-l", str(size_bytes)]
+            else:
+                command = ["ping", "-n", "1", "-w", str(timeout_ms), "-l", str(size_bytes)]
+        else:
+            if ipv6:
+                command = ["ping6", "-c", "1", "-W", str(timeout_ms / 1000), "-s", str(size_bytes)]
+            else:
+                command = ["ping", "-c", "1", "-W", str(timeout_ms / 1000), "-s", str(size_bytes)]
+        command.append(ip_address)
+        return command
+
+    try:
+        system = platform.system()
+        if ":" in ip_address:
+            # IPv6 address
+            # Check for IPv6 format
+            if checkString(ip_address) != True:
+                try:
+                    socket.inet_pton(socket.AF_INET6, ip_address)
+                except socket.error:
+                    handleBadHostname(ip_address)
+
+            command = get_ping_command(ip_address, system, timeout_ms, size_bytes, ipv6=True)
+        else:
+            # IPv4 address
+            # Check for IPv4 format
+            if checkString(ip_address) != True:
+                try:
+                    socket.inet_pton(socket.AF_INET, ip_address)
+                except socket.error:
+                    handleBadHostname(ip_address)
+
+            command = get_ping_command(ip_address, system, timeout_ms, size_bytes, ipv6=False)
+
+        result = subprocess.run(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=True,
+            **subprocess_args  # Pass the creationflags argument here
+        )
+
+        lines = result.stdout.split('\n')
+
+        # Initialize a list for this IP's ping data
+        ping_data2 = []
+
+        for line in lines:
+            line = line.strip()
+            if "time=" in line:
+                # Continue with the rest of the processing
+                parts = line.split()
+                datetime_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                ip_match = re.search(r'\(\S+\)', line)
+                reply_ip = parts[2] if "from" in line else ""
+                ttl_match = re.search(r'TTL=\d+', line)
+                ttl = ttl_match.group(0)[4:] if ttl_match else ""
+                status = "Success"
+                ping_time_match = re.search(r'time=\d+', line)
+                ping_time = ping_time_match.group(0)[5:] if ping_time_match else ""
+                ping_data2.append([datetime_now, reply_ip, ttl, status, ping_time])
+
+
+        return ip_address, ping_data2
+
+    except socket.error:
+        handleBadHostname(ip_address)
+
+    except subprocess.CalledProcessError:
+        ping_data2 = [
+            [datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "", "", "Failed", "Timeout"]
+        ]
+
+        return ip_address, ping_data2
 
 
 class PingConfigForm(tk.Toplevel):
@@ -140,7 +250,7 @@ class PingToolApp(tk.Tk):
             "size_bytes": 32  # Default ping size (32 bytes)
         }
 
-        self.ping_data = {}  # Use a dictionary to store ping data by IP
+        self.ping_data = ping_data  # Use a dictionary to store ping data by IP
         self.ping_timer_id = None
         self.ping_running = False
 
@@ -162,7 +272,7 @@ class PingToolApp(tk.Tk):
         self.button_stop.state(["!disabled"]) 
 
         text = self.text_ip_addresses.get("1.0", "end-1c")
-        ip_addresses = re.split(r'\n| ', text)
+        ip_addresses = list(filter(None, re.split(r'\n| ', text)))
         interval = self.ping_config["interval"]
         timeout_ms = self.ping_config["timeout_ms"]
         size_bytes = self.ping_config["size_bytes"]
@@ -174,22 +284,6 @@ class PingToolApp(tk.Tk):
             if len(top_level_items)>0:
                 for index, item in enumerate(top_level_items):
                     state_dict[index] = tree.item(item, 'open')
-        
-        def checkString(str):
- 
-            # initializing flag variable
-            flag_l = False
-        
-            # checking for letter and numbers in
-            # given string
-            for i in str:
-        
-                # if string has letter
-                if i.isalpha():
-                    flag_l = True
-        
-
-            return flag_l
 
         def reopen_treeview(tree, state_dict):
             for index, state in state_dict.items():
@@ -198,160 +292,25 @@ class PingToolApp(tk.Tk):
                     tree.item(item, open=True)
                 else:
                     tree.item(item, open=False)
-        def handleBadHostname(ip_address):
-            # Store the ping data in the dictionary under the
-            # IP address key
-            ping_data = [
-                        [datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "", "", "Bad Hostname", ""]
-                    ]
-            if ip_address not in self.ping_data:
-                self.ping_data[ip_address] = []
-            self.ping_data[ip_address].extend(ping_data)
-
-            # Clear the treeview
-            self.result_table.delete(*self.result_table.get_children())
-
-
-            # Add all the ping data to the treeview
-            index =0
-            for ip_address, data_list in self.ping_data.items():
-                # Create a unique identifier for this IP's subtree
-                if (index%2) == 0:
-                    subtree_id = self.result_table.insert("", "end", text=ip_address)
-                else:
-                    subtree_id = self.result_table.insert("", "end", text=ip_address, tags = "Gray")
-                
-                index+=1
-                fails = 0
-                successes = 0
-
-                # Add the ping data to the treeview under the IP's subtree
-                for data in data_list:
-                    if data[3] == "Success":
-                        tag = "Success"
-                        successes+=1
-                    else:
-                        tag = "Failed"
-                        fails+=1
-                    newItem = self.result_table.insert(subtree_id, "end", values=data,tags = tag)
-                    parent_item = self.result_table.parent(newItem)
-                    self.result_table.set(parent_item, 4, 'Timeouts: '+ str(fails))
-                    self.result_table.set(parent_item, 3, 'Successes: '+ str(successes))
-            
 
 
 
         def ping_devices():
-            traverse_top_level(self.result_table,state_dict=state_dict)
-            for ip_address in ip_addresses:
-                ip_address = ip_address.strip()
-                if not ip_address:
-                    continue
+            traverse_top_level(self.result_table, state_dict=state_dict)
+            # Define a function to ping a single IP address
 
-                try:
+            with concurrent.futures.ProcessPoolExecutor() as executor:
+                futures = [executor.submit(ping_single_ip, ip_address.strip(), timeout_ms, size_bytes) for ip_address in ip_addresses]
 
-                    system = platform.system()
-                    if ":" in ip_address:
-                        # IPv6 address
-                        # Check for IPv6 format
-                        if checkString(ip_address) != True:
-                            try:
-                                socket.inet_pton(socket.AF_INET6, ip_address)
-                            except socket.error:
-                                handleBadHostname(ip_address)
-                                continue
-                        command = self.get_ping_command(ip_address, system, timeout_ms, size_bytes, ipv6=True)
-                    else:
-                        # IPv4 address
-                        # Check for IPv4 format
-                        if checkString(ip_address) != True:
-                            try:
-                                socket.inet_pton(socket.AF_INET, ip_address)
-                            except socket.error:
-                                handleBadHostname(ip_address)
-                                continue
-                        command = self.get_ping_command(ip_address, system, timeout_ms, size_bytes, ipv6=False)
+                for future, ip_address in zip(concurrent.futures.as_completed(futures), ip_addresses):
+                    ip_address,ping_data = future.result()
 
 
-
-                    result = subprocess.run(
-                        command,
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE,
-                        text=True,
-                        check=True,
-                        **subprocess_args  # Pass the creationflags argument here
-                    )
-
-                    lines = result.stdout.split('\n')
-
-                    # Initialize a list for this IP's ping data
-                    ping_data = []
-
-                    for line in lines:
-                        line = line.strip()
-                        if "time=" in line:
-                            # Continue with the rest of the processing
-                            parts = line.split()
-                            datetime_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                            ip_match = re.search(r'\(\S+\)', line)
-                            reply_ip = parts[2] if "from" in line else ""
-                            ttl_match = re.search(r'TTL=\d+', line)
-                            ttl = ttl_match.group(0)[4:] if ttl_match else ""
-                            status = "Success"
-                            ping_time_match = re.search(r'time=\d+', line)
-                            ping_time = ping_time_match.group(0)[5:] if ping_time_match else ""
-                            ping_data.append([datetime_now, reply_ip, ttl, status, ping_time])
-
-                    # Store the ping data in the dictionary under the IP address key
-                    if ip_address not in self.ping_data:
-                        self.ping_data[ip_address] = []
-                    self.ping_data[ip_address].extend(ping_data)
-                except socket.error:
-                            handleBadHostname(ip_address)
-
-                except subprocess.CalledProcessError:
-                    ping_data = [
-                        [datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "", "", "Failed", "Timeout"]
-                    ]
-
-                    # Store the ping data in the dictionary under the
-                    # IP address key
                     if ip_address not in self.ping_data:
                         self.ping_data[ip_address] = []
                     self.ping_data[ip_address].extend(ping_data)
 
-                    # Clear the treeview
-                    self.result_table.delete(*self.result_table.get_children())
-
-
-                    # Add all the ping data to the treeview
-                    index =0
-                    for ip_address, data_list in self.ping_data.items():
-                        # Create a unique identifier for this IP's subtree
-                        if (index%2) == 0:
-                            subtree_id = self.result_table.insert("", "end", text=ip_address)
-                        else:
-                            subtree_id = self.result_table.insert("", "end", text=ip_address, tags = "Gray")
-                        
-                        index+=1
-                        fails = 0
-                        successes = 0
-
-                        # Add the ping data to the treeview under the IP's subtree
-                        for data in data_list:
-                            if data[3] == "Success":
-                                tag = "Success"
-                                successes+=1
-                            else:
-                                tag = "Failed"
-                                fails+=1
-                            newItem = self.result_table.insert(subtree_id, "end", values=data,tags = tag)
-                            parent_item = self.result_table.parent(newItem)
-                            self.result_table.set(parent_item, 4, 'Timeouts: '+ str(fails))
-                            self.result_table.set(parent_item, 3, 'Successes: '+ str(successes))
-
-            # Clear the treeview
+                    
             self.result_table.delete(*self.result_table.get_children())
 
             # Add all the ping data to the treeview
@@ -400,20 +359,6 @@ class PingToolApp(tk.Tk):
             if self.ping_timer_id:
                 self.after_cancel(self.ping_timer_id)
 
-    def get_ping_command(self, ip_address, system, timeout_ms, size_bytes, ipv6=False):
-        command = []
-        if system == "Windows":
-            if ipv6:
-                command = ["ping", "-6", "-n", "1", "-w", str(timeout_ms), "-l", str(size_bytes)]
-            else:
-                command = ["ping", "-n", "1", "-w", str(timeout_ms), "-l", str(size_bytes)]
-        else:
-            if ipv6:
-                command = ["ping6", "-c", "1", "-W", str(timeout_ms / 1000), "-s", str(size_bytes)]
-            else:
-                command = ["ping", "-c", "1", "-W", str(timeout_ms / 1000), "-s", str(size_bytes)]
-        command.append(ip_address)
-        return command
 
 
 if __name__ == "__main__":
