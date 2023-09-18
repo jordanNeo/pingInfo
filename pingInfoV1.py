@@ -152,6 +152,7 @@ class PingToolApp(tk.Tk):
         self.result_table.delete(*self.result_table.get_children())
         self.ping_data.clear()
 
+
     def start_ping(self):
         if self.ping_running:
             return
@@ -173,6 +174,22 @@ class PingToolApp(tk.Tk):
             if len(top_level_items)>0:
                 for index, item in enumerate(top_level_items):
                     state_dict[index] = tree.item(item, 'open')
+        
+        def checkString(str):
+ 
+            # initializing flag variable
+            flag_l = False
+        
+            # checking for letter and numbers in
+            # given string
+            for i in str:
+        
+                # if string has letter
+                if i.isalpha():
+                    flag_l = True
+        
+
+            return flag_l
 
         def reopen_treeview(tree, state_dict):
             for index, state in state_dict.items():
@@ -237,20 +254,22 @@ class PingToolApp(tk.Tk):
                     if ":" in ip_address:
                         # IPv6 address
                         # Check for IPv6 format
-                        try:
-                            socket.inet_pton(socket.AF_INET6, ip_address)
-                        except socket.error:
-                            handleBadHostname(ip_address)
-                            continue
+                        if checkString(ip_address) != True:
+                            try:
+                                socket.inet_pton(socket.AF_INET6, ip_address)
+                            except socket.error:
+                                handleBadHostname(ip_address)
+                                continue
                         command = self.get_ping_command(ip_address, system, timeout_ms, size_bytes, ipv6=True)
                     else:
                         # IPv4 address
                         # Check for IPv4 format
-                        try:
-                            socket.inet_pton(socket.AF_INET, ip_address)
-                        except socket.error:
-                            handleBadHostname(ip_address)
-                            continue
+                        if checkString(ip_address) != True:
+                            try:
+                                socket.inet_pton(socket.AF_INET, ip_address)
+                            except socket.error:
+                                handleBadHostname(ip_address)
+                                continue
                         command = self.get_ping_command(ip_address, system, timeout_ms, size_bytes, ipv6=False)
 
 
@@ -320,6 +339,8 @@ class PingToolApp(tk.Tk):
                             parent_item = self.result_table.parent(newItem)
                             self.result_table.set(parent_item, 3, 'Successes: '+ str(successes))
                             self.result_table.set(parent_item, 4, 'Timeouts: '+ str(fails))
+                except socket.error:
+                            handleBadHostname(ip_address)
 
                 except subprocess.CalledProcessError:
                     ping_data = [
