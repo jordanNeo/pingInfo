@@ -306,7 +306,6 @@ class PingToolApp(tk.Tk):
             traverse_top_level(self.result_table, state_dict=state_dict)
             # Define a function to ping a single IP address
 
-            st = time.time()
             with multiprocessing.Pool(processes=2 * multiprocessing.cpu_count()) as pool:
                 results = pool.starmap(ping_single_ip, [(ip.strip(), timeout_ms, size_bytes) for ip in ip_addresses])
             
@@ -316,10 +315,6 @@ class PingToolApp(tk.Tk):
                 ping_data[ip_address].extend(ping_data2)
 
 
-
-            et = time.time()
-            elapsed_time = et - st
-            print('runtime:', elapsed_time, 'seconds')
 
 
             self.result_table.delete(*self.result_table.get_children())
