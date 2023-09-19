@@ -1,14 +1,1 @@
-8.8.8.8
-google.com
-8.8.4.4
-ebay.com
-euronews.com
-rt.com
-newsnow.com
-playstation.com
-nintendo.com
-twitch.tv
-gmail.com
-youtube.com
-coolmathgames.com
-espn.com
+DRW10BPRESSWERK1.w10

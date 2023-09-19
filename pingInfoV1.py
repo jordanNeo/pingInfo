@@ -50,13 +50,14 @@ def ping_single_ip(ip_address, timeout_ms, size_bytes):
             if ipv6:
                 command = ["ping", "-6", "-n", "1", "-w", str(timeout_ms), "-l", str(size_bytes)]
             else:
-                command = ["ping", "-n", "1", "-w", str(timeout_ms), "-l", str(size_bytes)]
+                command = ["ping", "-4","-n", "1", "-w", str(timeout_ms), "-l", str(size_bytes)]
         else:
             if ipv6:
                 command = ["ping6", "-c", "1", "-W", str(timeout_ms / 1000), "-s", str(size_bytes)]
             else:
-                command = ["ping", "-c", "1", "-W", str(timeout_ms / 1000), "-s", str(size_bytes)]
+                command = ["ping", "-4","-c", "1", "-W", str(timeout_ms / 1000), "-s", str(size_bytes)]
         command.append(ip_address)
+        print(command)
         return command
 
     try:
@@ -64,6 +65,7 @@ def ping_single_ip(ip_address, timeout_ms, size_bytes):
         if ":" in ip_address:
             # IPv6 address
             # Check for IPv6 format
+            print(ip_address)
             if checkString(ip_address) != True:
                 try:
                     socket.inet_pton(socket.AF_INET6, ip_address)
@@ -74,6 +76,7 @@ def ping_single_ip(ip_address, timeout_ms, size_bytes):
         else:
             # IPv4 address
             # Check for IPv4 format
+            print(ip_address)
             if checkString(ip_address) != True:
                 try:
                     socket.inet_pton(socket.AF_INET, ip_address)
