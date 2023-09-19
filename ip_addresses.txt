@@ -1,1 +1,14 @@
-DRW10BPRESSWERK1.w10
+github.com
+twitter.com
+google.com
+facebook.com
+
+
+8.8.8.8
+8.8.4.4
+youtube.com
+newsnow.com
+coolmathgames.com
+twitch.tv
+wikipedia.com
+stackoverflow.com

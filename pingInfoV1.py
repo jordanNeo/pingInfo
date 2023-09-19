@@ -7,6 +7,7 @@ import tkinter as tk
 from tkinter import ttk
 import socket
 import multiprocessing
+import time
 
 # Check if running as a PyInstaller executable
 is_pyinstaller = getattr(sys, 'frozen', False)
@@ -16,6 +17,10 @@ subprocess_args = {'creationflags': subprocess.CREATE_NO_WINDOW} if is_pyinstall
 
 
 ping_data = {}
+
+def fetch_ping_data(ip_address, result):
+    ip_address, ping_data2 = result.get()
+    return ip_address, ping_data2
 
 
 def ping_single_ip(ip_address, timeout_ms, size_bytes):
@@ -57,7 +62,6 @@ def ping_single_ip(ip_address, timeout_ms, size_bytes):
             else:
                 command = ["ping", "-4","-c", "1", "-W", str(timeout_ms / 1000), "-s", str(size_bytes)]
         command.append(ip_address)
-        print(command)
         return command
 
     try:
@@ -65,7 +69,6 @@ def ping_single_ip(ip_address, timeout_ms, size_bytes):
         if ":" in ip_address:
             # IPv6 address
             # Check for IPv6 format
-            print(ip_address)
             if checkString(ip_address) != True:
                 try:
                     socket.inet_pton(socket.AF_INET6, ip_address)
@@ -76,7 +79,6 @@ def ping_single_ip(ip_address, timeout_ms, size_bytes):
         else:
             # IPv4 address
             # Check for IPv4 format
-            print(ip_address)
             if checkString(ip_address) != True:
                 try:
                     socket.inet_pton(socket.AF_INET, ip_address)
@@ -126,6 +128,8 @@ def ping_single_ip(ip_address, timeout_ms, size_bytes):
         ]
 
         return ip_address, ping_data2
+    
+"""def populate_ping_dict(ip_address, timeout_ms, size_bytes):"""
 
 
 class PingConfigForm(tk.Toplevel):
@@ -253,8 +257,7 @@ class PingToolApp(tk.Tk):
             "timeout_ms": 1000,  # Default timeout time (1000 milliseconds)
             "size_bytes": 32  # Default ping size (32 bytes)
         }
-
-        self.ping_data = ping_data  # Use a dictionary to store ping data by IP
+        
         self.ping_timer_id = None
         self.ping_running = False
 
@@ -264,7 +267,7 @@ class PingToolApp(tk.Tk):
 
     def refresh_ping(self):
         self.result_table.delete(*self.result_table.get_children())
-        self.ping_data.clear()
+        ping_data.clear()
 
 
     def start_ping(self):
@@ -303,29 +306,27 @@ class PingToolApp(tk.Tk):
             traverse_top_level(self.result_table, state_dict=state_dict)
             # Define a function to ping a single IP address
 
+            st = time.time()
             with multiprocessing.Pool(processes=2 * multiprocessing.cpu_count()) as pool:
-                results = []
-
-                for ip_address in ip_addresses:
-                    result = pool.apply_async(ping_single_ip, (ip_address.strip(), timeout_ms, size_bytes))
-                    results.append(result)
-
-                for result, ip_address in zip(results, ip_addresses):
-                    ip_address, ping_data = result.get()
-
-                    if ip_address not in self.ping_data:
-                        self.ping_data[ip_address] = []
-                    self.ping_data[ip_address].extend(ping_data)
+                results = pool.starmap(ping_single_ip, [(ip.strip(), timeout_ms, size_bytes) for ip in ip_addresses])
+            
+            for ip_address, ping_data2 in results:
+                if ip_address not in ping_data:
+                    ping_data[ip_address] = []
+                ping_data[ip_address].extend(ping_data2)
 
 
-                
-   
+
+            et = time.time()
+            elapsed_time = et - st
+            print('runtime:', elapsed_time, 'seconds')
+
 
             self.result_table.delete(*self.result_table.get_children())
 
             # Add all the ping data to the treeview
             index = 0
-            for ip_address, data_list in self.ping_data.items():
+            for ip_address, data_list in ping_data.items():
                 successes = 0
                 fails = 0
                 # Create a unique identifier for this IP's subtree
@@ -348,12 +349,12 @@ class PingToolApp(tk.Tk):
                         fails+=1
                     
                     newItem = self.result_table.insert(subtree_id, "end", values=data, tags = tag)
-                    parent_item = self.result_table.parent(newItem)
-                    self.result_table.set(parent_item, 3, 'Successes: '+ str(successes))
-                    self.result_table.set(parent_item, 4, 'Timeouts: '+ str(fails))                            
+                    self.result_table.set(subtree_id, 3, 'Successes: '+ str(successes))
+                    self.result_table.set(subtree_id, 4, 'Timeouts: '+ str(fails))                            
 
             if self.ping_running:
                 self.ping_timer_id = self.after(interval * 1000, ping_devices)
+
 
             reopen_treeview(self.result_table,state_dict)
 
